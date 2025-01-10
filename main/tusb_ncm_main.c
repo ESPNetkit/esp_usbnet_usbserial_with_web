@@ -54,10 +54,10 @@ static esp_err_t tinyusb_netif_recv_cb(void *buffer, uint16_t len, void *ctx)
     if (s_netif) {
         void *buf_copy = malloc(len);
         if (!buf_copy) {
-            ESP_LOGE(TAG,"No Memory for size: %d",len);
+            ESP_LOGI(TAG,"No Memory for size: %d",len);
             return ESP_ERR_NO_MEM;            
         } else {
-            ESP_LOGD(TAG, "received bytes from ethernet %d ",len);
+            ESP_LOGI(TAG, "received bytes from ethernet %d ",len);
         }
 
         memcpy(buf_copy, buffer, len);
