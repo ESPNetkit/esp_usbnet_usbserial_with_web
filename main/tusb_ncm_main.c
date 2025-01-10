@@ -134,27 +134,12 @@ ESP_LOGD("Ethernet->USB", "Sent to USB %d ",len);
 
 static esp_netif_recv_ret_t ethernetif_receieve_cb(void *h, void *buffer, size_t len, void *l2_buff)
 {
-#ifdef LOG_PAYLOAD
-ESP_LOG_BUFFER_HEX("Ethernet->ESP", buffer, len);
-#endif
-return ethernetif_input(h,buffer,len,l2_buff);
+    return ethernetif_input(h,buffer,len,l2_buff);
 }
-// with OUI range MAC to create a virtual netif running http server
-// this needs to be different to usb_interface_mac (==client)
-
-static bool is_valid_ip(int32_t addr)
-{
-    return addr != IPADDR_NONE;
-}
-
 
 #define NS "SNIFFER"
 #define DEF_IP "192.168.4.1"
  
-void save_ip(const char* ip,const char* def_ip )
-{
-}
-
 static u_int32_t load_ip(const char* def_ip)
 {
     int32_t def_ip_addr=ipaddr_addr(def_ip);
@@ -163,17 +148,15 @@ static u_int32_t load_ip(const char* def_ip)
 
 static esp_err_t create_virtual_net_if(esp_netif_t **res_s_netif)
 {
-            
-    int32_t ip =load_ip(DEF_IP);    
-     const esp_netif_ip_info_t esp_netif_soft_ap_ip = {
+
+    int32_t ip = load_ip(DEF_IP);    
+    const esp_netif_ip_info_t esp_netif_soft_ap_ip = {
         .ip = { .addr = ip },
         .gw = { .addr = ip}, 
         .netmask = { .addr = ipaddr_addr("255.255.255.0")},
-};
-    
+    };
     ESP_LOGI(TAG,"*********IP is: " IPSTR,IP2STR(&esp_netif_soft_ap_ip.ip)); 
-    
-    
+
     // 1) Derive the base config (very similar to IDF's default WiFi AP with DHCP server)
     esp_netif_inherent_config_t base_cfg =  {
         .flags = ESP_NETIF_DHCP_SERVER | ESP_NETIF_FLAG_AUTOUP, 
@@ -181,38 +164,40 @@ static esp_err_t create_virtual_net_if(esp_netif_t **res_s_netif)
         .if_key = "wired",
         .if_desc = "USB ncm config device",       
         .route_prio = 10
-        
     };
-    
+
     // 2) Use static config for driver's config pointing only to static transmit and free functions
     esp_netif_driver_ifconfig_t driver_cfg = {
         .handle = (void *)1,                // not using an instance, USB-NCM is a static singleton (must be != NULL)                
         .transmit =ether2usb_transmit_cb,         // point to static Tx function        
         .driver_free_rx_buffer =netif_l2_free_cb    // point to Free Rx buffer function
-        
-                
     };
 
     // 3) USB-NCM is an Ethernet netif from lwip perspective, we already have IO definitions for that:
     struct esp_netif_netstack_config lwip_netif_config = {
-        .lwip = {.init_fn = ethernetif_init,.input_fn = ethernetif_receieve_cb,}        
+        .lwip = {
+            .init_fn = ethernetif_init,
+            .input_fn = ethernetif_receieve_cb,
+        }        
     };
-         
-  
+
+
     esp_netif_config_t cfg = { // Config the esp-netif with:
         .base = &base_cfg,//   1) inherent config (behavioural settings of an interface)
         .driver = &driver_cfg,//   2) driver's config (connection to IO functions -- usb)
         .stack = &lwip_netif_config//   3) stack config (using lwip IO functions -- derive from eth)
     };
-esp_netif_t *s_netif= esp_netif_new(&cfg);    
+    esp_netif_t *s_netif= esp_netif_new(&cfg);    
     if (s_netif == NULL) {
-ESP_LOGE(TAG, "Cannot initialize if interface Net device");
+        ESP_LOGE(TAG, "Cannot initialize if interface Net device");
         return ESP_FAIL;
     }
-    
-    uint8_t lwip_addr[6]={0};        
-    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_base_mac_addr_get(lwip_addr));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_set_mac(s_netif, lwip_addr));
+
+    {
+        uint8_t lwip_addr[6]={0};        
+        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_base_mac_addr_get(lwip_addr));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_set_mac(s_netif, lwip_addr));
+    }
 
     /*
     uint32_t  lease_opt = 1000;// set the minimum lease time
@@ -226,7 +211,7 @@ ESP_LOGE(TAG, "Cannot initialize if interface Net device");
     // start the interface manually (as the driver has been started already)
     esp_netif_action_start(s_netif, 0, 0, 0);
     *res_s_netif =s_netif;
-     
+
     return ESP_OK;
 }
 
@@ -279,7 +264,10 @@ esp_err_t post_handler(httpd_req_t *req)
 
 esp_err_t index_handler(httpd_req_t *req)
 {
-    const char resp[] = "<!DOCTYPE html><html><head><title>ESPNetKit</title></head><body><h1>This is the ESPNetKit webserver through USB Ethernet</h1></body></html>";
+    const char resp[] = "<!DOCTYPE html><html><head><title>ESPNetKit</title></head>"
+                        "<body><h1>This is the ESPNetKit webserver through USB Ethernet</h1>"
+                        "<p>Visit our <a href=\"https://github.com/ESPNetkit/esp_usbnet_usbserial_with_web\">"
+                        "GitHub repository</a> for more information.</p></body></html>";
     httpd_resp_set_type(req, "text/html");
     httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
