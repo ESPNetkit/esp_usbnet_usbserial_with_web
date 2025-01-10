@@ -88,3 +88,11 @@ I (509) TinyUSB: TinyUSB Driver installed
 I (509) main_task: Returned from app_main()
 I (1129) esp_netif_lwip: DHCP server assigned IP to a client, IP is: 192.168.4.2
 ```
+
+## License
+
+This project is based on ESP-IDF v5.4. All licenses should follow the rules of that project.
+
+## SDK Environment
+
+Ensure you are using ESP-IDF v5.4 as the SDK environment. You can set up the ESP-IDF environment by following the instructions in the [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/v5.4/esp32/get-started/index.html).
