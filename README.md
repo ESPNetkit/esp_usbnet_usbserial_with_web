@@ -3,11 +3,9 @@
 
 # TinyUSB Network Control Model Device Example
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
-
 Network Control Model (NCM) is a sub-class of Communication Device Class (CDC) USB Device for Ethernet-over-USB applications.
 
-In this example, we implemented the ESP development board to transmit data to the Linux or Windows host via USB, so that the host could access the Internet.
+In this example, we implemented the ESP development board to transmit data to the Linux or Windows host via USB, so that the host could access the webserver on the board. Note that the host cannot access the internet through this connection.
 
 As a USB stack, a TinyUSB component is used.
 
@@ -20,8 +18,6 @@ Any ESP board that have USB-OTG supported.
 #### Pin Assignment
 
 _Note:_ In case your board doesn't have micro-USB connector connected to USB-OTG peripheral, you may have to DIY a cable and connect **D+** and **D-** to the pins listed below.
-
-See common pin assignments for USB Device examples from [upper level](../../README.md#common-pin-assignments).
 
 ### Configure the project
 
@@ -43,7 +39,7 @@ See the Getting Started Guide for full steps to configure and use ESP-IDF to bui
 
 ### Accessing the Webserver
 
-After the device is connected and the network is set up, you can access the webserver by navigating to the device's IP address in a web browser. The default page (`index.html`) will display a message indicating that "This is the ESPNetKit webserver through USB Ethernet".
+After the device is connected and the network is set up, you can access the webserver by navigating to the device's IP address (hardcoded to 192.168.4.1) in a web browser. The default page (`index.html`) will display a message indicating that "This is the ESPNetKit webserver through USB Ethernet". Note that this connection does not provide internet access.
 
 ## Example Output
 
