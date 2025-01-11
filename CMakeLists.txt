@@ -4,5 +4,9 @@ cmake_minimum_required(VERSION 3.16)
 
 # "Trim" the build. Include the minimal set of components, main, and anything it depends on.
 set(COMPONENTS main)
+
+# Define CFG_TUD_NCM_IN_NTB_N configuration
+add_compile_definitions(CFG_TUD_NCM_IN_NTB_N=10)
+
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(tusb_ncm)

@@ -54,10 +54,10 @@ static esp_err_t tinyusb_netif_recv_cb(void *buffer, uint16_t len, void *ctx)
     if (s_netif) {
         void *buf_copy = malloc(len);
         if (!buf_copy) {
-            ESP_LOGI(TAG,"No Memory for size: %d",len);
+            ESP_LOGE(TAG,"No Memory for size: %d",len);
             return ESP_ERR_NO_MEM;            
         } else {
-            ESP_LOGI(TAG, "received bytes from ethernet %d ",len);
+            ESP_LOGD(TAG, "received bytes from ethernet %d ",len);
         }
 
         memcpy(buf_copy, buffer, len);
@@ -100,13 +100,13 @@ static esp_err_t ether2usb_transmit_cb (void *h, void *buffer, size_t len)
 {
     esp_err_t esp_err = tinyusb_net_send_sync(buffer, len, NULL, pdMS_TO_TICKS(TUSB_SEND_TO));
     if (esp_err != ESP_OK){
-        ESP_LOGE("Ethernet->USB", "Failed to send, retrying , error %d" ,esp_err);
-        esp_err=tinyusb_net_send_sync(buffer, len, NULL, pdMS_TO_TICKS(TUSB_SEND_TO)*3);
+        ESP_LOGE("Ethernet->USB", "Failed to send, retrying, error %d: %s", esp_err, esp_err_to_name(esp_err));
+        esp_err = tinyusb_net_send_sync(buffer, len, NULL, pdMS_TO_TICKS(TUSB_SEND_TO) * 3);
     }
-    if (esp_err!= ESP_OK) {
-        ESP_LOGE("Ethernet->USB", "Failed to send buffer to USB! %d" ,esp_err);
+    if (esp_err != ESP_OK) {
+        ESP_LOGE("Ethernet->USB", "Failed to send buffer to USB! %d: %s", esp_err, esp_err_to_name(esp_err));
     } else {
-        ESP_LOGI("Ethernet->USB", "Sent to USB %zu ", len);
+        ESP_LOGD("Ethernet->USB", "Sent to USB %zu ", len);
     }
     return ESP_OK;
 }
