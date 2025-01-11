@@ -85,6 +85,11 @@ I (509) main_task: Returned from app_main()
 I (1129) esp_netif_lwip: DHCP server assigned IP to a client, IP is: 192.168.4.2
 ```
 
+## TODO
+
+- Hold the netpacket buffer from LWIP to prevent excess consumption on the buffer of tinyUSB.
+- Add webusb
+
 ## License
 
 This project is based on ESP-IDF v5.4. All licenses should follow the rules of that project.
