@@ -1,4 +1,4 @@
-idf_component_register(SRCS "tusb_ncm_main.c"
+idf_component_register(SRCS "tusb_ncm_main.c" "resetful_server.c"
                        INCLUDE_DIRS ""
                        PRIV_REQUIRES vfs spiffs esp_netif esp_http_server json
                        )
