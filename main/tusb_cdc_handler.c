@@ -7,9 +7,22 @@
 #include <sdkconfig.h>
 #include "tusb_ncm_demo.h"
 
-static const char *TAG = "tusb cdc";
-static uint8_t rx_buf[CONFIG_TINYUSB_CDC_RX_BUFSIZE + 1];
-static QueueHandle_t app_queue;
+static const char *TAG = "CDC_Handler";
+
+typedef struct {
+    uint32_t frame_count;
+    uint32_t total_bytes;
+    uint32_t queue_fail_count;
+    uint32_t queue_fail_bytes;
+} cdc_stats_t;
+
+typedef struct {
+    cdc_stats_t stats;
+    uint8_t rx_buf[CONFIG_TINYUSB_CDC_RX_BUFSIZE + 1];
+    QueueHandle_t app_queue;
+} cdc_context_t;
+
+static cdc_context_t s_cdc_ctx = {0};
 
 typedef struct {
     uint8_t buf[CONFIG_TINYUSB_CDC_RX_BUFSIZE + 1];
@@ -17,34 +30,52 @@ typedef struct {
     uint8_t itf;
 } app_message_t;
 
-void tinyusb_cdc_rx_callback(int itf, cdcacm_event_t *event)
+static void tinyusb_cdc_rx_callback(int itf, cdcacm_event_t *event)
 {
     size_t rx_size = 0;
-    esp_err_t ret = tinyusb_cdcacm_read(itf, rx_buf, CONFIG_TINYUSB_CDC_RX_BUFSIZE, &rx_size);
+    esp_err_t ret = tinyusb_cdcacm_read(itf, s_cdc_ctx.rx_buf, CONFIG_TINYUSB_CDC_RX_BUFSIZE, &rx_size);
     if (ret == ESP_OK) {
-        app_message_t tx_msg = {
-            .buf_len = rx_size,
-            .itf = itf,
-        };
-        memcpy(tx_msg.buf, rx_buf, rx_size);
-        xQueueSend(app_queue, &tx_msg, 0);
+        app_message_t tx_msg;
+        tx_msg.buf_len = rx_size;
+        tx_msg.itf = itf;
+        memcpy(tx_msg.buf, s_cdc_ctx.rx_buf, rx_size);
+        BaseType_t xStatus = xQueueSend(s_cdc_ctx.app_queue, &tx_msg, 0);
+        if (xStatus == pdTRUE) {
+            s_cdc_ctx.stats.frame_count++;
+            s_cdc_ctx.stats.total_bytes += tx_msg.buf_len;
+            ESP_LOGV(TAG, "Frame count: %lu, Byte count: %lu",
+                     s_cdc_ctx.stats.frame_count, s_cdc_ctx.stats.total_bytes);
+        } else {
+            s_cdc_ctx.stats.queue_fail_count++;
+            s_cdc_ctx.stats.queue_fail_bytes += tx_msg.buf_len;
+            ESP_LOGV(TAG, "Failed to send to queue, fail count: %lu, fail bytes: %lu",
+                     s_cdc_ctx.stats.queue_fail_count, s_cdc_ctx.stats.queue_fail_bytes);
+        }
     } else {
         ESP_LOGE(TAG, "Read Error");
     }
 }
 
-void tinyusb_cdc_line_state_changed_callback(int itf, cdcacm_event_t *event)
+static void tinyusb_cdc_line_state_changed_callback(int itf, cdcacm_event_t *event)
 {
     int dtr = event->line_state_changed_data.dtr;
     int rts = event->line_state_changed_data.rts;
     ESP_LOGI(TAG, "Line state changed on channel %d: DTR:%d, RTS:%d", itf, dtr, rts);
 }
 
+static void dump_cdc_stats(void)
+{
+    ESP_LOGI(TAG, "Frame count: %lu, Byte count: %lu, Fail count: %lu, Fail bytes: %lu",
+             (unsigned long)s_cdc_ctx.stats.frame_count,
+             (unsigned long)s_cdc_ctx.stats.total_bytes,
+             (unsigned long)s_cdc_ctx.stats.queue_fail_count,
+             (unsigned long)s_cdc_ctx.stats.queue_fail_bytes);
+}
 
 static void init_usb_serial(void)
 {
-    app_queue = xQueueCreate(5, sizeof(app_message_t));
-    ESP_ERROR_CHECK(app_queue != NULL ? ESP_OK : ESP_FAIL);
+    s_cdc_ctx.app_queue = xQueueCreate(5, sizeof(app_message_t));
+    ESP_ERROR_CHECK(s_cdc_ctx.app_queue != NULL ? ESP_OK : ESP_FAIL);
 
     ESP_LOGI(TAG, "USB ACM initialization");
 
@@ -69,8 +100,11 @@ static void init_usb_serial(void)
 static void tusb_cdc_handler_task(void *pvParameters)
 {
     app_message_t msg;
+    TickType_t last_wake_time = xTaskGetTickCount();
+    const TickType_t dump_interval = pdMS_TO_TICKS(10000); // 10 seconds
+
     while (1) {
-        if (xQueueReceive(app_queue, &msg, portMAX_DELAY)) {
+        if (xQueueReceive(s_cdc_ctx.app_queue, &msg, portMAX_DELAY)) {
             if (msg.buf_len) {
                 ESP_LOGI(TAG, "Data from channel %d:", msg.itf);
                 ESP_LOG_BUFFER_HEXDUMP(TAG, msg.buf, msg.buf_len, ESP_LOG_INFO);
@@ -82,16 +116,25 @@ static void tusb_cdc_handler_task(void *pvParameters)
                 }
             }
         }
+
+        // Dump statistics at the specified interval
+        if (xTaskGetTickCount() - last_wake_time >= dump_interval) {
+            dump_cdc_stats();
+            last_wake_time = xTaskGetTickCount();
+        }
     }
+}
+
+static void start_cdc_handler_task()
+{
+    s_cdc_ctx.app_queue = xQueueCreate(10, sizeof(app_message_t));
+    xTaskCreate(tusb_cdc_handler_task, "cdc_handler_task", 4096, NULL, 5, NULL);
 }
 
 int tusb_cdc_handler_init(void)
 {
     // Initialize USB serial
     init_usb_serial();
-
-    // Create the task to handle USB CDC
-    xTaskCreate(tusb_cdc_handler_task, "tusb_cdc_handler_task", 4096, NULL, 5, NULL);
-
+    start_cdc_handler_task();
     return ESP_OK;
 }
