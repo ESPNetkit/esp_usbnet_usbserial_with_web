@@ -29,7 +29,6 @@
 
 static const char *TAG = "NCM/RNDIS";
 #define DEF_IP "192.168.4.1"
- 
 static void tinyusb_netif_free_buffer_cb(void *buffer, void *ctx)
 {
     //TODO use slot instead of buffer from heap
@@ -56,14 +55,16 @@ static esp_err_t tinyusb_netif_recv_cb(void *buffer, uint16_t len, void *ctx)
     return ESP_OK;
 }
 
-static esp_err_t create_usb_eth_if(esp_netif_t *s_netif,tusb_net_rx_cb_t tusb_net_rx_cb,tusb_net_free_tx_cb_t tusb_net_free_tx_cb)
+static esp_err_t install_tinyusb_driver(void)
 {
     const tinyusb_config_t tusb_cfg = {
-        .external_phy = false,      
+        .external_phy = false,
     };
-    
-    ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
-    
+    return tinyusb_driver_install(&tusb_cfg);
+}
+
+static esp_err_t create_usb_eth_if(esp_netif_t *s_netif,tusb_net_rx_cb_t tusb_net_rx_cb,tusb_net_free_tx_cb_t tusb_net_free_tx_cb)
+{
     tinyusb_net_config_t net_config = {
         // locally administrated address for the ncm device as it's going to be used internally        
        .mac_addr ={0},                   
@@ -212,16 +213,21 @@ static esp_err_t init_fs(void)
 void app_main(void)
 {
     ESP_LOGI(TAG, "starting app for RNDIS and webusb");
-    
+
     // Initialize the TCP/IP stack
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    
+
+    // Install TinyUSB driver
+    ESP_ERROR_CHECK(install_tinyusb_driver());
+
     // Initialize the wired network interface
     init_wired_netif();
 
-    //init spiffs
+    // Initialize SPIFFS
     init_fs();
     
     ESP_ERROR_CHECK(resetful_server_start(CONFIG_EXAMPLE_WEB_MOUNT_POINT));
+
+    tusb_cdc_handler_init();
 }
